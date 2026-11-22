@@ -1,0 +1,13 @@
+{
+  "name": "thailand-trip-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.5.438"
+  }
+}
