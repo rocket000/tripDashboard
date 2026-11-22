@@ -13,6 +13,7 @@ function category(file) {
 }
 
 export function folderLabel(file) {
+  if (file.mimeType === folderMime && /^hotel[ _-]*bookings$/i.test(file.name)) return 'Hotel bookings';
   return category(file)?.name ?? file.name;
 }
 

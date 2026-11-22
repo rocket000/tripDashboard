@@ -2,11 +2,18 @@ import { clientId } from './config.js';
 import { connectDrive, driveLink, driveScope, fileKind, folderErrorMessage, folderMime, previewType } from './drive.js';
 import { openPdf, renderPage } from './pdf.js';
 import { folderLabel, orderTripEntries, tripFolderId } from './trip.js';
+import { flightCard, itineraryFile, readItinerary, stayCard } from './itinerary.js';
 
 const $ = id => document.getElementById(id);
 const connect = $('connect');
 const disconnect = $('disconnect');
 const welcome = $('welcome');
+const dashboard = $('dashboard');
+const overview = $('overview');
+const overviewStatus = $('overview-status');
+const overviewNav = $('overview-nav');
+const documentsNav = $('documents-nav');
+const folderNav = $('folder-nav');
 const documents = $('documents');
 const notice = $('notice');
 const refresh = $('refresh');
@@ -29,9 +36,15 @@ let pendingSignIn = false;
 let drive;
 let expiry;
 let folderRequest;
+let overviewRequest;
+let tripRoot;
 let preview;
 let path = [];
 let files = [];
+
+function itemCount(count, singular, plural) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
 
 function showNotice(message = '') {
   notice.textContent = message;
@@ -62,6 +75,9 @@ function endSession(message) {
   drive = null;
   folderRequest?.abort();
   folderRequest = null;
+  overviewRequest?.abort();
+  overviewRequest = null;
+  tripRoot = null;
   resetPreview();
   path = [];
   files = [];
@@ -71,6 +87,10 @@ function endSession(message) {
   summary.textContent = '';
   results.setAttribute('aria-busy', 'false');
   documents.hidden = true;
+  dashboard.hidden = true;
+  folderNav.replaceChildren();
+  clearItinerary();
+  showOverviewStatus();
   disconnect.hidden = true;
   welcome.hidden = false;
   showNotice(message);
@@ -90,6 +110,80 @@ function action(label, onClick, className) {
   button.className = className;
   button.addEventListener('click', onClick);
   return button;
+}
+
+function showOverviewStatus(message = '') {
+  overviewStatus.textContent = message;
+  overviewStatus.hidden = !message;
+}
+
+function clearItinerary() {
+  $('itinerary').hidden = true;
+  $('flights').replaceChildren();
+  $('stays').replaceChildren();
+  $('trip-period').textContent = 'Flights, hotel stays, and trip documents.';
+}
+
+function openOverview() {
+  folderRequest?.abort();
+  folderRequest = null;
+  resetPreview();
+  documents.hidden = true;
+  overview.hidden = false;
+  markSection(overviewNav);
+  showNotice();
+}
+
+function markSection(active) {
+  for (const button of [overviewNav, documentsNav, ...folderNav.children]) {
+    if (button === active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+}
+
+function openDocuments(nextPath) {
+  if (!tripRoot) return;
+  overview.hidden = true;
+  documents.hidden = false;
+  markSection([...folderNav.children].find(button => button.dataset.folderId === nextPath[1]?.id) ?? documentsNav);
+  loadFolder(nextPath);
+}
+
+function renderFolderNav(entries) {
+  const buttons = entries.filter(file => file.mimeType === folderMime).map(folder => {
+    const button = action(folderLabel(folder), () => openDocuments([tripRoot, folder]), 'nav-button');
+    button.dataset.folderId = folder.id;
+    return button;
+  });
+  folderNav.replaceChildren(...buttons);
+}
+
+async function loadOverview(entries) {
+  overviewRequest?.abort();
+  const request = new AbortController();
+  overviewRequest = request;
+  const file = entries.find(item => item.name === itineraryFile && item.mimeType !== folderMime);
+  clearItinerary();
+  if (!file) {
+    showOverviewStatus('The organizer needs to upload trip-overview.json to the main trip folder in Drive. You can open the original files from All documents.');
+    return;
+  }
+
+  showOverviewStatus('Loading your itinerary…');
+  try {
+    const itinerary = await readItinerary(drive, file, request.signal);
+    if (overviewRequest !== request) return;
+    $('trip-period').textContent = itinerary.period;
+    $('flights-jump').textContent = itemCount(itinerary.flights.length, 'flight', 'flights');
+    $('stays-jump').textContent = itemCount(itinerary.stays.length, 'hotel stay', 'hotel stays');
+    $('flights').replaceChildren(...itinerary.flights.map(flightCard));
+    $('stays').replaceChildren(...itinerary.stays.map(stayCard));
+    $('itinerary').hidden = false;
+    showOverviewStatus();
+  } catch (error) {
+    if (overviewRequest !== request || sessionExpired(error)) return;
+    showOverviewStatus('Could not load the trip overview. You can still open the original documents.');
+  }
 }
 
 function renderPath() {
@@ -121,7 +215,7 @@ function renderFiles() {
   const query = search.value.trim().toLocaleLowerCase();
   const matches = files.filter(file => folderLabel(file).toLocaleLowerCase().includes(query));
   summary.textContent = matches.length
-    ? `${matches.length} ${matches.length === 1 ? 'item' : 'items'}`
+    ? itemCount(matches.length, 'item', 'items')
     : query ? 'No files or folders match your search.' : 'This folder is empty.';
 
   const rows = matches.map(file => {
@@ -129,7 +223,7 @@ function renderFiles() {
     row.className = 'item';
     const folder = file.mimeType === folderMime;
     const button = action(folderLabel(file), () => {
-      if (folder) loadFolder([...path, file]);
+      if (folder) openDocuments([...path, file]);
       else showPreview(file, { selectedByTraveler: true });
     }, 'item-name');
     const label = document.createElement('span');
@@ -149,7 +243,7 @@ function renderFiles() {
   items.replaceChildren(...rows);
 }
 
-async function loadFolder(nextPath, { resetSearch = true } = {}) {
+async function loadFolder(nextPath, { resetSearch = true, startOnOverview = false } = {}) {
   if (!drive) return;
   folderRequest?.abort();
   const request = new AbortController();
@@ -172,16 +266,31 @@ async function loadFolder(nextPath, { resetSearch = true } = {}) {
     if (folderRequest !== request) return;
 
     path = [...nextPath.slice(0, -1), verified];
-    files = verified.id === tripFolderId ? orderTripEntries(entries) : entries;
+    const atRoot = verified.id === tripFolderId;
+    files = atRoot
+      ? orderTripEntries(entries.filter(file => file.name !== itineraryFile || file.mimeType === folderMime))
+      : entries;
     if (resetSearch) search.value = '';
     welcome.hidden = true;
-    documents.hidden = false;
+    dashboard.hidden = false;
+    if (atRoot) {
+      tripRoot = verified;
+      renderFolderNav(files);
+      if (!startOnOverview) markSection(documentsNav);
+      loadOverview(entries);
+    }
+    if (startOnOverview) {
+      overview.hidden = false;
+      documents.hidden = true;
+      markSection(overviewNav);
+      return;
+    }
     renderPath();
     results.setAttribute('aria-busy', 'false');
     renderFiles();
-    const selected = entries.find(file => file.id === selectedId)
-      ?? entries.find(file => previewType(file) && file.capabilities?.canDownload !== false)
-      ?? entries.find(file => file.mimeType !== folderMime);
+    const selected = files.find(file => file.id === selectedId)
+      ?? files.find(file => previewType(file) && file.capabilities?.canDownload !== false)
+      ?? files.find(file => file.mimeType !== folderMime);
     if (selected) showPreview(selected);
   } catch (error) {
     if (folderRequest !== request || sessionExpired(error)) return;
@@ -292,7 +401,7 @@ function authorize(response) {
     endSession('Your Google connection expired. Connect again to reopen the trip folder.');
   }, (lifetime > 0 ? lifetime : 3600) * 1000);
   disconnect.hidden = false;
-  loadFolder([{ id: tripFolderId }]);
+  loadFolder([{ id: tripFolderId }], { startOnOverview: true });
 }
 
 function setup() {
@@ -340,6 +449,8 @@ connect.addEventListener('click', () => {
   }
 });
 disconnect.addEventListener('click', () => endSession());
+overviewNav.addEventListener('click', openOverview);
+documentsNav.addEventListener('click', () => openDocuments([tripRoot]));
 refresh.addEventListener('click', () => loadFolder(path, { resetSearch: false }));
 search.addEventListener('input', renderFiles);
 previousPage.addEventListener('click', () => showPdfPage(preview, preview.page - 1));

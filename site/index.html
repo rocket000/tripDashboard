@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client 'wasm-unsafe-eval'; style-src 'self' https://accounts.google.com/gsi/style; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; img-src 'self' blob:; worker-src 'self'; base-uri 'none'; form-action 'none'">
-  <title>Thailand trip · Documents</title>
+  <title>Thailand trip · Itinerary</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
@@ -18,8 +18,8 @@
   </header>
   <main class="wrap">
     <section class="hero" aria-labelledby="page-title">
-      <h1 id="page-title">Trip documents</h1>
-      <p>Flights, stays, and everything you need on the go.</p>
+      <h1 id="page-title">Thailand itinerary</h1>
+      <p id="trip-period">Flights, hotel stays, and trip documents.</p>
     </section>
 
     <section id="welcome" class="panel welcome">
@@ -30,35 +30,64 @@
 
     <p id="notice" class="notice" role="status" hidden></p>
 
-    <section id="documents" class="panel documents" aria-label="Trip folder" hidden>
-      <div class="toolbar">
-        <nav id="breadcrumbs" aria-label="Folder path"></nav>
-        <button id="refresh" class="button secondary" type="button" disabled>Refresh</button>
-      </div>
-      <div class="filter">
-        <label for="search">Find a file</label>
-        <input id="search" type="search" placeholder="Search this folder" autocomplete="off">
-      </div>
-      <div class="document-gallery">
-        <div id="results" aria-busy="false">
-          <p id="summary" class="summary" role="status"></p>
-          <ul id="items" class="items" aria-label="Folder contents"></ul>
+    <div id="dashboard" class="dashboard" hidden>
+      <aside class="sidebar">
+        <nav aria-label="Trip navigation">
+          <button id="overview-nav" class="nav-button" type="button" aria-current="page">Overview</button>
+          <button id="documents-nav" class="nav-button" type="button">All documents</button>
+          <div id="folder-nav" class="folder-nav"></div>
+        </nav>
+      </aside>
+      <section id="overview" class="overview" aria-label="Trip overview">
+        <p id="overview-status" class="panel overview-status" role="status" hidden></p>
+        <div id="itinerary" hidden>
+          <nav class="overview-jumps" aria-label="Jump to itinerary section">
+            <a href="#flights-heading" id="flights-jump">Flights</a>
+            <a href="#stays-heading" id="stays-jump">Hotel stays</a>
+          </nav>
+          <section class="itinerary-section" aria-labelledby="flights-heading">
+            <div class="section-heading">
+              <h2 id="flights-heading">Flights</h2>
+              <p>All times are local to the airport.</p>
+            </div>
+            <ol id="flights" class="itinerary-cards flight-timeline"></ol>
+          </section>
+          <section class="itinerary-section" aria-labelledby="stays-heading">
+            <div class="section-heading"><h2 id="stays-heading">Hotel stays</h2></div>
+            <ol id="stays" class="itinerary-cards stay-cards"></ol>
+          </section>
         </div>
-        <section id="preview" class="preview" aria-labelledby="preview-title" hidden>
-          <div class="preview-header">
-            <h2 id="preview-title" tabindex="-1"></h2>
-            <a id="preview-link" class="button secondary" target="_blank" rel="noopener noreferrer">Open in Drive</a>
+      </section>
+      <section id="documents" class="panel documents" aria-label="Trip folder" hidden>
+        <div class="toolbar">
+          <nav id="breadcrumbs" aria-label="Folder path"></nav>
+          <button id="refresh" class="button secondary" type="button" disabled>Refresh</button>
+        </div>
+        <div class="filter">
+          <label for="search">Find a file</label>
+          <input id="search" type="search" placeholder="Search this folder" autocomplete="off">
+        </div>
+        <div class="document-gallery">
+          <div id="results" aria-busy="false">
+            <p id="summary" class="summary" role="status"></p>
+            <ul id="items" class="items" aria-label="Folder contents"></ul>
           </div>
-          <p id="preview-status" class="preview-status" role="status"></p>
-          <div id="preview-content" class="preview-content"></div>
-          <div id="page-controls" class="page-controls" hidden>
-            <button id="previous-page" class="button secondary" type="button">Previous</button>
-            <span id="page-number" aria-live="polite"></span>
-            <button id="next-page" class="button secondary" type="button">Next</button>
-          </div>
-        </section>
-      </div>
-    </section>
+          <section id="preview" class="preview" aria-labelledby="preview-title" hidden>
+            <div class="preview-header">
+              <h2 id="preview-title" tabindex="-1"></h2>
+              <a id="preview-link" class="button secondary" target="_blank" rel="noopener noreferrer">Open in Drive</a>
+            </div>
+            <p id="preview-status" class="preview-status" role="status"></p>
+            <div id="preview-content" class="preview-content"></div>
+            <div id="page-controls" class="page-controls" hidden>
+              <button id="previous-page" class="button secondary" type="button">Previous</button>
+              <span id="page-number" aria-live="polite"></span>
+              <button id="next-page" class="button secondary" type="button">Next</button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
   </main>
 
 </body>

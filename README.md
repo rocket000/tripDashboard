@@ -2,6 +2,12 @@
 
 A mobile-friendly document hub hosted on GitHub Pages. Travelers open a single group link, connect the Google account you invited, and browse and preview files in the dashboard.
 
+## Add the private trip overview
+
+Upload the generated `trip-overview.json` from the project root directly into the main restricted Drive folder beside the ticket and hotel subfolders. Keep the exact filename and a single copy in Drive. The dashboard loads this file after Google authorization and uses it to display the flight and hotel cards. Flight cards group passengers by airline PNR. The document sidebar follows the folders returned by Drive.
+
+The local booking PDFs, itinerary JSON, and OAuth client secret downloads are ignored by Git and excluded from the static build. To update the overview, replace the JSON in Drive and reload the dashboard.
+
 ## Set up Google Drive and OAuth
 
 1. The dashboard opens the trip folder configured in [site/trip.js](site/trip.js). Set **General access** to **Restricted** and share the folder with the seven travelers' Google accounts. Give most travelers Viewer access. Keep identity documents in separately restricted folders if their access should differ from that of the group.
